@@ -735,6 +735,52 @@ select:hover {
   color: var(--muted);
 }
 
+/* ---------- 讲义 ---------- */
+
+.prose {
+  font-size: 14.5px;
+  line-height: 1.8;
+}
+
+.prose p + p {
+  margin-top: 8px;
+}
+
+.progression-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.progression-step {
+  flex: 1 1 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.progression-step .roman {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.progression-step .chord {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.progression-step:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .note-pill.root {
   background: var(--accent-soft);
   border-color: #b9cee2;

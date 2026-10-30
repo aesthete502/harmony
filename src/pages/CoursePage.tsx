@@ -1,22 +1,43 @@
+import { useState } from 'react';
+import { lessonFor } from '../content/lessons';
 import { LEVELS, isLevelUnlocked, PASS_RATE } from '../content/levels';
+import type { ExploreRequest } from '../navigation';
 import { levelAccuracy, type Store } from '../storage';
+import { LessonPage } from './LessonPage';
 
 interface Props {
   store: Store;
-  onOpenLevel: (level: number) => void;
+  onStartPractice: (level: number) => void;
+  onOpenInExplore: (request: ExploreRequest) => void;
 }
 
-export function CoursePage({ store, onOpenLevel }: Props) {
+export function CoursePage({ store, onStartPractice, onOpenInExplore }: Props) {
+  const [openLevel, setOpenLevel] = useState<number | null>(null);
+  const lesson = openLevel === null ? undefined : lessonFor(openLevel);
+
+  if (lesson) {
+    return (
+      <LessonPage
+        lesson={lesson}
+        canPractice={LEVELS.find((l) => l.id === lesson.level)?.ready ?? false}
+        onBack={() => setOpenLevel(null)}
+        onPractice={() => onStartPractice(lesson.level)}
+        onOpenInExplore={onOpenInExplore}
+      />
+    );
+  }
+
   return (
     <div className="stack">
       <div className="card stack">
-        <div className="question">按顺序学，也可以跳着练</div>
+        <div className="question">先读讲义，再去练习</div>
         <p className="small muted">
-          每一关都是「先看构成，再做构成题」。构成题稳定在 85% 以上再往下走，听辨部分会在批 2 补上。
+          每关一篇，200–400 字，配一张会动的谱面/键盘图和一段试听，最后有 3 道自测。讲义里的「在探索页打开」可以把它
+          放进探索页慢慢对比。
         </p>
         <div className="row-wrap">
-          <span className="badge">L1–L4 已开放</span>
-          <span className="badge">L5–L9 批 2</span>
+          <span className="badge">L1–L9 讲义已就绪</span>
+          <span className="badge">练习 L1–L4 已开放</span>
           <span className="badge accent">通关线 {Math.round(PASS_RATE * 100)}%</span>
         </div>
       </div>
@@ -31,14 +52,13 @@ export function CoursePage({ store, onOpenLevel }: Props) {
           return (
             <button
               key={l.id}
-              className={`level-card${l.ready ? '' : ' locked'}`}
-              disabled={!l.ready}
-              onClick={() => onOpenLevel(l.id)}
-              title={l.ready ? l.goal : '批 2 开放'}
+              className="level-card"
+              onClick={() => setOpenLevel(l.id)}
+              title={`打开 L${l.id} 讲义`}
             >
               <span className="lv">
                 L{l.id}
-                {!l.ready && ' · 待开放'}
+                {!l.ready && ' · 练习待开放'}
               </span>
               <span className="ttl">{l.title}</span>
               <span className="tiny muted">{l.goal}</span>
@@ -60,7 +80,9 @@ export function CoursePage({ store, onOpenLevel }: Props) {
         })}
       </div>
 
-      <p className="hint">关卡只是推荐顺序，不会强行锁住；想先看 L4 的和弦也可以直接点进去。</p>
+      <p className="hint">
+        L5–L9 的讲义可以先读，练习会随批 2 一起开放。关卡只是推荐顺序，不会强行锁住。
+      </p>
     </div>
   );
 }

@@ -22,7 +22,7 @@ const SUBTITLES: Record<View, string> = {
   explore: '看构成 · 点击任意键试听',
   circle: '12 个调 · 顺阶和弦',
   practice: '构成题 · 想练多少练多少',
-  course: 'L1–L9 · 按关推进',
+  course: 'L1–L9 讲义 · 先读再练',
   progress: '正确率 · 导出导入',
 };
 
@@ -98,10 +98,11 @@ export default function App() {
         {view === 'course' && (
           <CoursePage
             store={store}
-            onOpenLevel={(next) => {
+            onStartPractice={(next) => {
               setLevel(next);
               setView('practice');
             }}
+            onOpenInExplore={openInExplore}
           />
         )}
         {view === 'progress' && <ProgressPage store={store} update={update} />}

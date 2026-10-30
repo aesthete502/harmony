@@ -7,14 +7,16 @@ interface Props {
   showDegrees?: boolean;
   /** 传入后每个音变成可点的试听按钮 */
   onPlayNote?: (midi: number) => void;
+  /** 外面已经有标题时（比如讲义卡片）不再重复显示 set.title */
+  hideTitle?: boolean;
 }
 
-export function NoteSetPanel({ set, showDegrees = true, onPlayNote }: Props) {
+export function NoteSetPanel({ set, showDegrees = true, onPlayNote, hideTitle = false }: Props) {
   return (
     <div className="stack">
       <div className="row spread">
         <div className="grow">
-          <div style={{ fontWeight: 650, fontSize: 16 }}>{set.title}</div>
+          {!hideTitle && <div style={{ fontWeight: 650, fontSize: 16 }}>{set.title}</div>}
           <div className="small muted">{withTheoryHints(set.subtitle)}</div>
         </div>
         <span className="badge accent">{set.notes.length} 个音</span>
