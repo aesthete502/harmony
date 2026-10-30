@@ -5,6 +5,7 @@ import { NoteSetPanel } from '../components/NoteSetPanel';
 import { PianoKeyboard } from '../components/PianoKeyboard';
 import { StaffView } from '../components/StaffView';
 import { keyboardRange, resolveFigure } from '../content/figure';
+import { LESSONS } from '../content/lessons';
 import type { Lesson, LessonFigure, LessonQuizItem } from '../content/lessons';
 import type { ExploreRequest } from '../navigation';
 import { withTheoryHints } from '../theory';
@@ -15,6 +16,7 @@ interface Props {
   canPractice: boolean;
   onBack: () => void;
   onPractice: () => void;
+  onOpenLesson: (level: number) => void;
   onOpenInExplore: (request: ExploreRequest) => void;
 }
 
@@ -169,7 +171,18 @@ function Quiz({ items }: { items: LessonQuizItem[] }) {
   );
 }
 
-export function LessonPage({ lesson, canPractice, onBack, onPractice, onOpenInExplore }: Props) {
+export function LessonPage({
+  lesson,
+  canPractice,
+  onBack,
+  onPractice,
+  onOpenLesson,
+  onOpenInExplore,
+}: Props) {
+  const index = LESSONS.findIndex((l) => l.level === lesson.level);
+  const prev = index > 0 ? LESSONS[index - 1] : undefined;
+  const next = index >= 0 && index < LESSONS.length - 1 ? LESSONS[index + 1] : undefined;
+
   return (
     <div className="stack">
       <div className="row spread">
@@ -204,6 +217,23 @@ export function LessonPage({ lesson, canPractice, onBack, onPractice, onOpenInEx
       {lesson.contrast && <FigureCard fig={lesson.contrast} onOpenInExplore={onOpenInExplore} />}
 
       <Quiz items={lesson.quiz} />
+
+      <div className="row-wrap" style={{ justifyContent: 'space-between', gap: 8 }}>
+        {prev ? (
+          <button className="btn btn-sm btn-ghost" onClick={() => onOpenLesson(prev.level)}>
+            ← L{prev.level} {prev.title}
+          </button>
+        ) : (
+          <span />
+        )}
+        {next ? (
+          <button className="btn btn-sm btn-ghost" onClick={() => onOpenLesson(next.level)}>
+            L{next.level} {next.title} →
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
     </div>
   );
 }

@@ -22,6 +22,7 @@ export function CoursePage({ store, onStartPractice, onOpenInExplore }: Props) {
         canPractice={LEVELS.find((l) => l.id === lesson.level)?.ready ?? false}
         onBack={() => setOpenLevel(null)}
         onPractice={() => onStartPractice(lesson.level)}
+        onOpenLesson={setOpenLevel}
         onOpenInExplore={onOpenInExplore}
       />
     );

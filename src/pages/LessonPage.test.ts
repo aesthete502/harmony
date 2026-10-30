@@ -17,6 +17,7 @@ describe('讲义页', () => {
           canPractice: lesson.level <= 4,
           onBack: () => {},
           onPractice: () => {},
+          onOpenLesson: () => {},
           onOpenInExplore: () => {},
         }),
       );
