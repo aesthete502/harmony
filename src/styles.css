@@ -441,7 +441,10 @@ select:hover {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
-  touch-action: pan-y;
+  /* 允许横向拖动键盘（pan-y 会把横向手势交给浏览器，键盘就划不动了）；纵向仍交给页面滚动 */
+  touch-action: pan-x pan-y;
+  /* 划到头时不要触发浏览器的「后退」手势 */
+  overscroll-behavior-x: contain;
   /* 隐藏内部滚动条：否则它会改变页面高度，窄窗口下和宽度自适应互相触发，键盘会闪 */
   scrollbar-width: none;
 }
@@ -470,6 +473,8 @@ select:hover {
   justify-content: center;
   padding-bottom: 6px;
   transition: background 0.08s ease;
+  /* 连点琴键时不要触发双击缩放 */
+  touch-action: manipulation;
 }
 
 .key.white {

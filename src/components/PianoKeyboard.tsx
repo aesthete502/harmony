@@ -167,10 +167,7 @@ export function PianoKeyboard({
               aria-pressed={selectedSet.has(midi) || highlightedSet.has(midi)}
               title={theoryFor(midi) ? `理论拼写 ${theoryFor(midi)}` : undefined}
               disabled={disabled}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                handle(midi);
-              }}
+              onPointerDown={() => handle(midi)}
             >
               <span className="key-label">{labelFor(midi)}</span>
             </button>
@@ -186,10 +183,7 @@ export function PianoKeyboard({
             aria-pressed={selectedSet.has(midi) || highlightedSet.has(midi)}
             title={theoryFor(midi) ? `理论拼写 ${theoryFor(midi)}` : undefined}
             disabled={disabled}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              handle(midi);
-            }}
+            onPointerDown={() => handle(midi)}
           >
             <span className="key-label">{labelFor(midi)}</span>
           </button>
