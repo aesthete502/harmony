@@ -24,7 +24,8 @@ npm run dev
 
 ## 部署
 
-推送到 `main` 后由 `.github/workflows/deploy.yml` 自动构建并发布到 GitHub Pages。工作流会尝试自动启用 Pages（Source 设为 **GitHub Actions**）；如果第一次就失败，到仓库 **Settings → Pages** 手动把 Source 改成 GitHub Actions，再重新运行工作流。
+推送到 `main` 后由 `.github/workflows/deploy.yml` 自动构建并发布到 GitHub Pages。
+第一次需要到仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**（仓库级的 Actions token 没有创建 Pages 站点的权限，这一步只能手动点一次）。
 
 项目站点会部署在 `https://<用户名>.github.io/<仓库名>/`，工作流已自动把 `BASE_PATH` 设为 `/<仓库名>/`。
 如果用的是用户站点（`<用户名>.github.io` 仓库），把工作流里的 `BASE_PATH` 改成 `/`。
