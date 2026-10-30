@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { chroma, isBlackKey, midiToPretty, octaveOf, spellingOf } from '../theory';
 
 export interface KeyboardResult {
@@ -125,6 +126,35 @@ export function PianoKeyboard({
     onKey?.(midi);
   };
 
+  /**
+   * 手机上键盘要能横向滑动查看，所以不能在 pointerdown 就判成「点键」：
+   * 练习页单击即判分，滑一下键盘会白丢一题。
+   * 现在按下时只记位置，松手时位移在 TAP_SLOP 以内才算点键；
+   * 真的横向拖动会触发浏览器的滚动，指针事件被 cancel，本来也不会走到这里。
+   */
+  const TAP_SLOP = 12;
+  const pressRef = useRef(new Map<number, { midi: number; x: number; y: number }>());
+
+  const pressProps = (midi: number) => ({
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      pressRef.current.set(e.pointerId, { midi, x: e.clientX, y: e.clientY });
+    },
+    onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      const start = pressRef.current.get(e.pointerId);
+      pressRef.current.delete(e.pointerId);
+      if (!start || start.midi !== midi) return;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP) return;
+      handle(midi);
+    },
+    onPointerCancel: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      pressRef.current.delete(e.pointerId);
+    },
+    // Tab 聚焦后按回车/空格只会触发 click（detail 为 0），鼠标/触摸点击已经由上面的指针事件处理
+    onClick: (e: ReactMouseEvent<HTMLButtonElement>) => {
+      if (e.detail === 0) handle(midi);
+    },
+  });
+
   // 先尽量铺满容器，太窄时退回最小可点宽度（小屏可横向滚动）
   const fitWidth = wrapWidth > 0 ? wrapWidth / whites.length : minKeyWidth;
   const whiteKeyWidth = Math.max(minKeyWidth, Math.min(56, fitWidth));
@@ -167,7 +197,7 @@ export function PianoKeyboard({
               aria-pressed={selectedSet.has(midi) || highlightedSet.has(midi)}
               title={theoryFor(midi) ? `理论拼写 ${theoryFor(midi)}` : undefined}
               disabled={disabled}
-              onPointerDown={() => handle(midi)}
+              {...pressProps(midi)}
             >
               <span className="key-label">{labelFor(midi)}</span>
             </button>
@@ -183,7 +213,7 @@ export function PianoKeyboard({
             aria-pressed={selectedSet.has(midi) || highlightedSet.has(midi)}
             title={theoryFor(midi) ? `理论拼写 ${theoryFor(midi)}` : undefined}
             disabled={disabled}
-            onPointerDown={() => handle(midi)}
+            {...pressProps(midi)}
           >
             <span className="key-label">{labelFor(midi)}</span>
           </button>
