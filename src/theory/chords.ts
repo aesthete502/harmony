@@ -88,6 +88,7 @@ export const CHORD_TYPES: ChordType[] = [
 ];
 
 export const TRIAD_TYPES = CHORD_TYPES.filter((t) => t.semitones.length === 3);
+export const SEVENTH_TYPES = CHORD_TYPES.filter((t) => t.semitones.length === 4);
 
 export function getChordType(id: string): ChordType {
   const type = CHORD_TYPES.find((t) => t.id === id);

@@ -21,7 +21,7 @@ const TABS: { id: View; label: string; icon: (p: { size?: number }) => React.JSX
 const SUBTITLES: Record<View, string> = {
   explore: '看构成 · 点击任意键试听',
   circle: '12 个调 · 顺阶和弦',
-  practice: '构成题 · 想练多少练多少',
+  practice: '构成 + 听辨 · 答错进错题本',
   course: 'L1–L9 讲义 · 先读再练',
   progress: '正确率 · 导出导入',
 };

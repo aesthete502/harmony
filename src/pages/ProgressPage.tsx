@@ -73,6 +73,7 @@ export function ProgressPage({ store, update }: Props) {
           <span className="badge">正确率 {Math.round(overall.rate * 100)}%</span>
           <span className="badge">已练 {practiced.length} 关</span>
           <span className="badge ok">通关 {passedCount} 关</span>
+          {store.mistakes.length > 0 && <span className="badge">错题 {store.mistakes.length}</span>}
         </div>
       </div>
 
@@ -98,6 +99,36 @@ export function ProgressPage({ store, update }: Props) {
               </div>
             );
           })
+        )}
+      </div>
+
+      <div className="card stack">
+        <span className="section-title">错题本</span>
+        {store.mistakes.length === 0 ? (
+          <p className="small muted">没有待复习的错题。答错的题会自动进来，连续答对 2 次移出。</p>
+        ) : (
+          <>
+            <div className="row-wrap">
+              <span className="badge accent">{store.mistakes.length} 题待复习</span>
+              <span className="badge">连续答对 2 次移出</span>
+            </div>
+            <div className="stack" style={{ gap: 4 }}>
+              {store.mistakes.slice(0, 5).map((m) => (
+                <div className="small muted" key={m.key}>
+                  L{m.level} · {m.question.prompt}
+                </div>
+              ))}
+            </div>
+            {store.mistakes.length > 5 && (
+              <p className="hint">还有 {store.mistakes.length - 5} 题，去练习页点「只练错题」。</p>
+            )}
+          </>
+        )}
+        {store.earNoRef.attempts > 0 && (
+          <p className="hint">
+            无参照音听辨：{store.earNoRef.correct} / {store.earNoRef.attempts} 正确（
+            {Math.round((store.earNoRef.correct / store.earNoRef.attempts) * 100)}%）
+          </p>
         )}
       </div>
 

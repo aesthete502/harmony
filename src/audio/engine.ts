@@ -85,6 +85,28 @@ class AudioEngine {
     return duration + gap * Math.max(0, ordered.length - 1);
   }
 
+  /**
+   * 按时间轴播放：每个事件从第 0 毫秒开始算，单位毫秒。
+   * 听辨题（先放参照音、再放题目）和和弦进行都用它，一次排进 AudioContext。
+   */
+  async playTimeline(
+    events: { midis: number[]; at: number; dur: number; gain?: number }[],
+  ): Promise<number> {
+    if (events.length === 0) return 0;
+    const ctx = this.ensure();
+    await this.unlock();
+
+    const start = ctx.currentTime + 0.06;
+    let end = 0;
+    for (const e of events) {
+      for (const midi of e.midis) {
+        this.instrument?.trigger(midi, start + e.at / 1000, e.dur / 1000, e.gain ?? 0.62);
+      }
+      end = Math.max(end, e.at + e.dur);
+    }
+    return end;
+  }
+
   /** 播放一串和弦（每个和弦一组 MIDI），供和声进行使用 */
   async playSequence(
     chords: number[][],

@@ -38,7 +38,7 @@ export function CoursePage({ store, onStartPractice, onOpenInExplore }: Props) {
         </p>
         <div className="row-wrap">
           <span className="badge">L1–L9 讲义已就绪</span>
-          <span className="badge">练习 L1–L4 已开放</span>
+          <span className="badge">练习 L1–L8 已开放</span>
           <span className="badge accent">通关线 {Math.round(PASS_RATE * 100)}%</span>
         </div>
       </div>
@@ -82,7 +82,7 @@ export function CoursePage({ store, onStartPractice, onOpenInExplore }: Props) {
       </div>
 
       <p className="hint">
-        L5–L9 的讲义可以先读，练习会随批 2 一起开放。关卡只是推荐顺序，不会强行锁住。
+        L1–L8 的练习已经开放，L9 的和声进行会随批 3 一起开放。关卡只是推荐顺序，不会强行锁住。
       </p>
     </div>
   );

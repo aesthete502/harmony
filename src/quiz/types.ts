@@ -7,12 +7,39 @@ export type TaskKind =
   | 'build-interval'
   | 'identify-interval'
   | 'invert-interval'
+  | 'ear-interval'
   | 'build-chord'
   | 'identify-chord'
   | 'identify-root'
-  | 'identify-inversion';
+  | 'identify-inversion'
+  | 'ear-chord'
+  | 'build-minor-scale'
+  | 'relative-key'
+  | 'ear-tonality'
+  | 'build-seventh'
+  | 'seventh-inversion'
+  | 'ear-seventh'
+  | 'build-scale-family'
+  | 'scale-feature'
+  | 'ear-scale-family'
+  | 'build-mode'
+  | 'mode-feature'
+  | 'ear-mode';
 
 export type AnswerMode = 'keys' | 'choice';
+
+/** 听辨题的播放方式：旋律（依次） / 和声（同时） / 跟随设置 */
+export type EarStyle = 'melodic' | 'harmonic' | 'setting';
+
+export interface EarSpec {
+  /** 参照音（主音或根音），播放时先放它；关掉参照音设置后不播 */
+  reference?: number;
+  /** 要听的材料 */
+  midis: number[];
+  style: EarStyle;
+  /** 给用户的一句提示，如「先听主音，再听两个音」 */
+  note: string;
+}
 
 export interface Question {
   id: string;
@@ -38,6 +65,8 @@ export interface Question {
   playMidis?: number[];
   /** 是否隐藏键盘上的 C 标记 */
   hideKeyNames?: boolean;
+  /** 听辨题：题面不放键盘高亮，靠播放来判断 */
+  ear?: EarSpec;
 }
 
 export interface Answer {
@@ -56,4 +85,13 @@ export function checkAnswer(question: Question, keys: number[], choice: string |
   const expected = [...(question.expectedKeys ?? [])].sort((a, b) => a - b).join(',');
   const given = [...new Set(keys)].sort((a, b) => a - b).join(',');
   return expected === given;
+}
+
+/** 同一道题的稳定签名：错题本用它去重，重新生成到同一道题时不会重复入库 */
+export function questionKey(question: Question): string {
+  const answer =
+    question.answerMode === 'choice'
+      ? (question.correctChoice ?? '')
+      : [...(question.expectedKeys ?? [])].sort((a, b) => a - b).join(',');
+  return `${question.level}|${question.kind}|${question.prompt}|${answer}`;
 }

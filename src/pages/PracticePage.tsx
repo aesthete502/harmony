@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { audio } from '../audio';
+import { buildEarTimeline } from '../audio/ear';
 import { IconPlay } from '../components/Icons';
 import { PianoKeyboard } from '../components/PianoKeyboard';
 import { LEVELS, levelMeta } from '../content/levels';
-import { createSession } from '../quiz/generators';
-import { checkAnswer } from '../quiz/types';
+import { createMixedSession } from '../quiz/generators';
+import { checkAnswer, questionKey } from '../quiz/types';
 import type { Question, TaskKind } from '../quiz/types';
-import { levelAccuracy, recordAnswer, recordSession, type Store } from '../storage';
+import { levelAccuracy, recordAttempt, recordSession, type Store } from '../storage';
 import { midiToPretty, withTheoryHints } from '../theory';
 
 const KIND_LABELS: Record<TaskKind, string> = {
@@ -18,13 +19,28 @@ const KIND_LABELS: Record<TaskKind, string> = {
   'build-interval': '构音程',
   'identify-interval': '认音程',
   'invert-interval': '音程转位',
+  'ear-interval': '听音程',
   'build-chord': '构和弦',
   'identify-chord': '认和弦性质',
   'identify-root': '找根音',
   'identify-inversion': '认转位',
+  'ear-chord': '听和弦',
+  'build-minor-scale': '构小调',
+  'relative-key': '关系大小调',
+  'ear-tonality': '听大小调',
+  'build-seventh': '构七和弦',
+  'seventh-inversion': '认七和弦转位',
+  'ear-seventh': '听七和弦',
+  'build-scale-family': '构音阶家族',
+  'scale-feature': '找特征音',
+  'ear-scale-family': '听音阶家族',
+  'build-mode': '构调式',
+  'mode-feature': '找调式特征音',
+  'ear-mode': '听调式',
 };
 
 const DEFAULT_SESSION_SIZE = 10;
+const MISTAKE_SESSION_SIZE = 20;
 
 interface Props {
   level: number;
@@ -53,6 +69,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
   const [correctCount, setCorrectCount] = useState(0);
   const [answeredTotal, setAnsweredTotal] = useState(0);
   const [done, setDone] = useState(false);
+  const [mistakeMode, setMistakeMode] = useState(false);
 
   const meta = levelMeta(level);
   const accuracy = levelAccuracy(store, level);
@@ -60,6 +77,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
   const question = session?.[index] ?? null;
   const sessionSize = store.settings.sessionSize;
   const endless = sessionSize === 0;
+  const mistakes = store.mistakes;
 
   const reset = () => {
     setSelected([]);
@@ -68,13 +86,33 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
     setLastCorrect(false);
   };
 
-  const start = () => {
-    setSession(createSession(level, endless ? DEFAULT_SESSION_SIZE : sessionSize));
+  const beginSession = (questions: Question[], onlyMistakes = false) => {
+    setMistakeMode(onlyMistakes);
+    setSession(questions);
     setIndex(0);
     setCorrectCount(0);
     setAnsweredTotal(0);
     setDone(false);
     reset();
+  };
+
+  const start = () => {
+    // 在用户点击里解锁音频，后面听辨题自动播放才不会被浏览器拦
+    void audio.unlock();
+    beginSession(
+      createMixedSession(level, endless ? DEFAULT_SESSION_SIZE : sessionSize, store),
+      false,
+    );
+  };
+
+  const startMistakes = () => {
+    void audio.unlock();
+    beginSession(
+      createMixedSession(level, Math.min(MISTAKE_SESSION_SIZE, mistakes.length), store, {
+        mistakesOnly: true,
+      }),
+      true,
+    );
   };
 
   useEffect(() => {
@@ -83,21 +121,37 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
     setCorrectCount(0);
     setAnsweredTotal(0);
     setDone(false);
+    setMistakeMode(false);
     reset();
   }, [level]);
 
-  const finish = (ok: boolean, keys: number[], picked: string | null) => {
+  /** 一道听辨题的时间轴：参照音 → 题目材料（和声或上行/下行） */
+  const playEar = async (q: Question) => {
+    const ear = q.ear;
+    if (!ear) {
+      if (q.playMidis) await audio.play(q.playMidis, { mode: 'up', noteMs: 700 });
+      return;
+    }
+    await audio.playTimeline(
+      buildEarTimeline(ear, { reference: store.settings.earReference, mode: store.settings.playMode }),
+    );
+  };
+
+  const finish = (q: Question, ok: boolean, keys: number[], picked: string | null) => {
     setSelected(keys);
     setChoice(picked);
     setRevealed(true);
     setLastCorrect(ok);
-    update((s) => recordAnswer(s, level, ok));
     if (ok) setCorrectCount((n) => n + 1);
+
+    const fromMistake = store.mistakes.some((m) => m.key === questionKey(q));
+    const usedReference = q.ear?.reference === undefined || store.settings.earReference;
+    update((s) => recordAttempt(s, q, ok, { fromMistake, usedReference }));
   };
 
   const submitKeys = (keys: number[]) => {
     if (!question || revealed) return;
-    finish(checkAnswer(question, keys, null), keys, null);
+    finish(question, checkAnswer(question, keys, null), keys, null);
   };
 
   const handleKey = (midi: number) => {
@@ -106,7 +160,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
     if (question.answerMode !== 'keys') return;
     const expected = question.expectedKeys ?? [];
     if (expected.length === 1) {
-      finish(checkAnswer(question, [midi], null), [midi], null);
+      finish(question, checkAnswer(question, [midi], null), [midi], null);
       return;
     }
     setSelected((prev) => (prev.includes(midi) ? prev.filter((m) => m !== midi) : [...prev, midi]));
@@ -114,27 +168,45 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
 
   const handleChoice = (value: string) => {
     if (!question || revealed) return;
-    finish(checkAnswer(question, [], value), [], value);
+    finish(question, checkAnswer(question, [], value), [], value);
   };
+
+  // 听辨题出现时自动播一遍；被浏览器拦掉也不影响，页面上有播放按钮
+  const currentId = question?.id;
+  const playedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!question?.ear || revealed) return;
+    if (playedRef.current === question.id) return; // StrictMode 会跑两次 effect
+    playedRef.current = question.id;
+    void playEar(question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
 
   const finishSession = (total: number) => {
     if (total <= 0) return;
-    update((s) => recordSession(s, level, total, correctCount));
+    if (!mistakeMode) update((s) => recordSession(s, level, total, correctCount));
     setAnsweredTotal(total);
     setDone(true);
   };
 
   const next = () => {
     if (!session) return;
-    if (!endless && index >= session.length - 1) {
-      finishSession(session.length);
+    if (!endless || mistakeMode) {
+      if (index >= session.length - 1) {
+        finishSession(index + 1);
+        return;
+      }
+      setIndex((i) => i + 1);
+      reset();
       return;
     }
-    if (endless && index >= session.length - 1) {
-      // 不限题数：一次多生成 10 题，题目是现算的，不会重复用旧题
+    if (index >= session.length - 1) {
+      // 不限题数：一次多生成 10 题，仍然按 70/20/10 的比例
       setSession([
         ...session,
-        ...createSession(level, DEFAULT_SESSION_SIZE, session[session.length - 1]?.kind),
+        ...createMixedSession(level, DEFAULT_SESSION_SIZE, store, {
+          excludeKind: session[session.length - 1]?.kind,
+        }),
       ]);
     }
     setIndex((i) => i + 1);
@@ -165,7 +237,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
             key={l.id}
             className={`chip${l.id === level ? ' active' : ''}`}
             disabled={!l.ready}
-            title={l.ready ? l.goal : '批 2 开放'}
+            title={l.ready ? l.goal : '后续批次开放'}
             onClick={() => onLevelChange(l.id)}
           >
             L{l.id} {l.title}
@@ -182,7 +254,9 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
         {levelChips}
         <div className="card stack">
           <div>
-            <div className="question">L{level} {meta?.title}</div>
+            <div className="question">
+              L{level} {meta?.title}
+            </div>
             <p className="small muted" style={{ marginTop: 4 }}>
               {meta?.goal}
             </p>
@@ -191,7 +265,9 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
             <span className="badge">{endless ? '不限题数' : `一组 ${sessionSize} 题`}</span>
             <span className="badge">通关需累计 {meta?.required} 题 · 正确率 85%</span>
             {stat && <span className="badge ok">已练 {stat.attempts} 题</span>}
+            {level >= 3 && <span className="badge accent">含听辨题</span>}
           </div>
+
           <div className="row spread">
             <span className="small muted">本组题数</span>
             <div className="seg">
@@ -206,13 +282,78 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
               ))}
             </div>
           </div>
+
+          <div className="row spread">
+            <span className="small muted">听辨先播参照音</span>
+            <div className="seg">
+              <button
+                className={store.settings.earReference ? 'active' : ''}
+                onClick={() => onSettingsChange({ earReference: true })}
+              >
+                开
+              </button>
+              <button
+                className={store.settings.earReference ? '' : 'active'}
+                onClick={() => onSettingsChange({ earReference: false })}
+              >
+                关
+              </button>
+            </div>
+          </div>
+
+          <div className="row spread">
+            <span className="small muted">听辨播放方式</span>
+            <div className="seg">
+              {(
+                [
+                  ['up', '上行'],
+                  ['down', '下行'],
+                  ['block', '和声'],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  className={store.settings.playMode === mode ? 'active' : ''}
+                  onClick={() => onSettingsChange({ playMode: mode })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button className="btn btn-primary" onClick={start}>
             开始练习
           </button>
+
           <p className="hint">
-            题目是即时随机的，不设题库上限：同一组里不会连续考同一种题型，重开一组就是新题。
-            构成题多点几个键再提交，识别题直接点选项，答完会显示答案和构成解释。
+            题目是即时随机的，不设题库上限：同一组里不会连续考同一种题型，重开一组就是新题。构成题多点几个键再提交，
+            识别题直接点选项，听辨题先播音频再选，答完会显示答案和构成解释。
           </p>
+          <p className="hint">每组按 70% 当前关 · 20% 错题 · 10% 已通关关卡的比例组题。</p>
+        </div>
+
+        <div className="card stack">
+          <div className="row spread">
+            <span className="section-title">错题本</span>
+            <span className={`badge${mistakes.length > 0 ? ' accent' : ''}`}>{mistakes.length} 题</span>
+          </div>
+          <p className="small muted">
+            {mistakes.length === 0
+              ? '还没有错题。答错的题会自动记下来，重做时连续答对 2 次就移出。'
+              : '答错的题会自动进来，重做时连续答对 2 次移出。可以单独练一遍，也可以等它混进普通练习。'}
+          </p>
+          {mistakes.length > 0 && (
+            <button className="btn" onClick={startMistakes}>
+              只练错题（{Math.min(MISTAKE_SESSION_SIZE, mistakes.length)} 题）
+            </button>
+          )}
+          {store.earNoRef.attempts > 0 && (
+            <p className="hint">
+              无参照音听辨：{store.earNoRef.correct} / {store.earNoRef.attempts} 正确（
+              {Math.round((store.earNoRef.correct / store.earNoRef.attempts) * 100)}%）
+            </p>
+          )}
         </div>
       </div>
     );
@@ -225,7 +366,9 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
       <div className="stack">
         {levelChips}
         <div className="card stack" style={{ alignItems: 'center', textAlign: 'center' }}>
-          <span className="section-title">{endless ? '本轮结束' : '本组完成'}</span>
+          <span className="section-title">
+            {mistakeMode ? '错题复习完成' : endless ? '本轮结束' : '本组完成'}
+          </span>
           <div className="result-score">
             {correctCount}/{total}
           </div>
@@ -243,7 +386,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
             </button>
           </div>
           <p className="hint">
-            累计正确率达标后，这一关会在课程页显示为已通关。错题会在批 2 进入错题本。
+            累计正确率达标后，这一关会在课程页显示为已通关。答错的题已经进了错题本。
           </p>
         </div>
       </div>
@@ -261,6 +404,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
             .map((midi) => question.revealLabels?.[midi] ?? midiToPretty(midi))
             .join('、'),
         );
+  const showReference = question.ear?.reference !== undefined && store.settings.earReference;
 
   return (
     <div className="stack">
@@ -268,12 +412,17 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
 
       <div className="card stack">
         <div className="row spread">
-          <span className="badge accent">{KIND_LABELS[question.kind]}</span>
+          <span className="badge accent">
+            {question.ear ? '听辨 · ' : ''}
+            {KIND_LABELS[question.kind]}
+          </span>
           <span className="tiny muted">
-            第 {index + 1} 题{endless ? ' · 不限题数' : ` / ${session.length}`} · 答对 {correctCount}
+            L{question.level} · 第 {index + 1} 题{endless ? ' · 不限题数' : ` / ${session.length}`} · 答对{' '}
+            {correctCount}
+            {mistakeMode ? ' · 错题复习' : ''}
           </span>
         </div>
-        {endless ? (
+        {endless && !mistakeMode ? (
           <div className="row spread">
             <span className="tiny muted">做完这道可以继续，也可以随时结束</span>
             <button
@@ -293,19 +442,32 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
         <div className="question">{question.prompt}</div>
         {question.hint && !revealed && <p className="hint">{question.hint}</p>}
 
-        {(question.answerMode === 'keys' || (question.highlight?.length ?? 0) > 0) && (
-          <PianoKeyboard
-            from={question.keyRange[0]}
-            to={question.keyRange[1]}
-            highlighted={question.highlight}
-            selected={question.answerMode === 'keys' ? selected : []}
-            result={result}
-            labels={answerLabels}
-            onKey={handleKey}
-            disabled={revealed}
-            ariaLabel="答题键盘"
-          />
+        {question.ear && (
+          <div className="ear-panel">
+            <button className="btn btn-primary" onClick={() => void playEar(question)}>
+              <IconPlay size={16} /> 播放题目
+            </button>
+            <span className="tiny muted">
+              {question.ear.note}
+              {question.ear.reference !== undefined && (showReference ? ' · 含参照音' : ' · 无参照音')}
+            </span>
+          </div>
         )}
+
+        {!question.ear &&
+          (question.answerMode === 'keys' || (question.highlight?.length ?? 0) > 0) && (
+            <PianoKeyboard
+              from={question.keyRange[0]}
+              to={question.keyRange[1]}
+              highlighted={question.highlight}
+              selected={question.answerMode === 'keys' ? selected : []}
+              result={result}
+              labels={answerLabels}
+              onKey={handleKey}
+              disabled={revealed}
+              ariaLabel="答题键盘"
+            />
+          )}
 
         {question.answerMode === 'keys' && (
           <div className="row spread">
@@ -366,14 +528,14 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
         <div className="row spread">
           <button
             className="btn btn-sm"
-            onClick={() => question.playMidis && void audio.play(question.playMidis, { mode: 'up', noteMs: 700 })}
-            disabled={!question.playMidis}
+            onClick={() => void playEar(question)}
+            disabled={!question.ear && !question.playMidis}
           >
-            <IconPlay size={14} /> 听一下
+            <IconPlay size={14} /> 再听一次
           </button>
           {revealed ? (
             <button className="btn btn-primary" onClick={next}>
-              {!endless && index >= session.length - 1 ? '查看结果' : '下一题'}
+              {(!endless || mistakeMode) && index >= session.length - 1 ? '查看结果' : '下一题'}
             </button>
           ) : (
             <span className="tiny muted">作答后显示解析</span>
