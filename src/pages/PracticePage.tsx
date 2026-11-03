@@ -412,10 +412,7 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
 
       <div className="card stack">
         <div className="row spread">
-          <span className="badge accent">
-            {question.ear ? '听辨 · ' : ''}
-            {KIND_LABELS[question.kind]}
-          </span>
+          <span className="badge accent">{KIND_LABELS[question.kind]}</span>
           <span className="tiny muted">
             L{question.level} · 第 {index + 1} 题{endless ? ' · 不限题数' : ` / ${session.length}`} · 答对{' '}
             {correctCount}
@@ -526,13 +523,13 @@ export function PracticePage({ level, onLevelChange, store, update, onSettingsCh
         )}
 
         <div className="row spread">
-          <button
-            className="btn btn-sm"
-            onClick={() => void playEar(question)}
-            disabled={!question.ear && !question.playMidis}
-          >
-            <IconPlay size={14} /> 再听一次
-          </button>
+          {!question.ear && question.playMidis ? (
+            <button className="btn btn-sm" onClick={() => void playEar(question)}>
+              <IconPlay size={14} /> 再听一次
+            </button>
+          ) : (
+            <span />
+          )}
           {revealed ? (
             <button className="btn btn-primary" onClick={next}>
               {(!endless || mistakeMode) && index >= session.length - 1 ? '查看结果' : '下一题'}

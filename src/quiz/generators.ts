@@ -396,7 +396,7 @@ function earIntervalQuestion(level: number, ids: readonly string[]): Question {
     level,
     kind: 'ear-interval',
     prompt: '听两个音，它们构成什么音程？',
-    hint: '先听参照的主音，再判断两个音的距离',
+    hint: '先听参照的根音，再判断两个音的距离',
     answerMode: 'choice',
     keyRange: EAR_RANGE,
     choices: earIntervalChoices(type),
@@ -409,7 +409,7 @@ function earIntervalQuestion(level: number, ids: readonly string[]): Question {
       reference: rootMidi,
       midis: [rootMidi, target.midi],
       style: 'setting',
-      note: '先播主音，再播这两个音',
+      note: '先播根音，再播这两个音',
     },
   };
 }
